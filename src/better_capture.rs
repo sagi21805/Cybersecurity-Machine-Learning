@@ -1,4 +1,4 @@
-use pcap::Capture;
+use pcap::{Capture, Device};
 use pnet::packet::ethernet::EthernetPacket;
 use libc::timeval;
 use chrono::{DateTime, NaiveDateTime, Local};
@@ -9,9 +9,23 @@ fn timeval_to_datetime(tv: timeval) -> DateTime<Local> {
     DateTime::from_timestamp(seconds, nanoseconds).unwrap().with_timezone(&Local)
 }
 fn main() {
-    let mut cap = Capture::from_device("wlp0s20f3").unwrap()
-                    .promisc(true)
-                    .open().unwrap();
+    let interface_name = "wlp0s20f3";
+    let device = Device::list()
+        .expect("Failed to list devices")
+        .into_iter()
+        .find(|dev| dev.name == interface_name)
+        .expect("Failed to find specified device");
+
+    // Initialize a capture with promiscuous mode and a larger buffer size
+    let mut cap = Capture::from_device(device)
+        .expect("Failed to create capture from device")
+        .promisc(true)
+        .buffer_size(65536) // Increase the buffer size
+        .timeout(1) // Set a small timeout for non-blocking behavior
+        .open()
+        .expect("Failed to open capture");
+
+    println!("Starting packet capture on interface {}", interface_name);
 
     while let Ok(packet) = cap.next_packet() {
         println!("received packet! {:?} at {:?}", EthernetPacket::new(packet.data), timeval_to_datetime(packet.header.ts));
