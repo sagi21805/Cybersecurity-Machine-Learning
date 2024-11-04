@@ -4,4 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+chrono = "0.4.38"
+libc = "0.2.161"
+pcap = "2.2.0"
 pnet = "0.35.0"
