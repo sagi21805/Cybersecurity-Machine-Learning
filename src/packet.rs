@@ -1,23 +1,22 @@
 use pnet::packet::arp::{Arp, ArpPacket};
+use pnet::packet::dns::{Dns, DnsPacket};
 use pnet::packet::ethernet::{EtherTypes, Ethernet, EthernetPacket};
+use pnet::packet::icmp::{Icmp, IcmpPacket};
+use pnet::packet::icmpv6::{Icmpv6, Icmpv6Packet};
 use pnet::packet::ip::IpNextHeaderProtocols;
 use pnet::packet::ipv4::{Ipv4, Ipv4Packet};
 use pnet::packet::ipv6::{Ipv6, Ipv6Packet};
 use pnet::packet::tcp::{Tcp, TcpPacket};
 use pnet::packet::udp::{Udp, UdpPacket};
-use pnet::packet::dns::{Dns, DnsPacket};
-use pnet::packet::icmp::{Icmp, IcmpPacket};
-use pnet::packet::icmpv6::{Icmpv6, Icmpv6Packet};
 // use pnet::packet::dhcp::{Dhcp, DhcpPacket};
+use crate::protocol_utils::*;
 use chrono::{DateTime, Local};
+use paste::paste;
 use pnet::packet::Packet;
 use strum_macros::Display;
-use crate::protocol_utils::*;
-use paste::paste;
-
 
 macro_rules! FullEthernetPacket {
-    
+
     ($( $protocol:ident ),*) => {
         paste! {
             #[derive(Debug, Clone)]
@@ -88,7 +87,6 @@ pub enum FullPacket {
     // FullIpv6Dhcp(FullIpv6Dhcp),
 }
 
-
 impl FullPacket {
     pub fn new(packet_bytes: &[u8], local_capture_time: DateTime<Local>) -> FullPacket {
         let ethernet_packet =
@@ -97,17 +95,24 @@ impl FullPacket {
         let ethernet_header = ethernet_packet.into_header();
 
         match ethernet_header.ethertype {
-            
             EtherTypes::Ipv4 => {
                 let ipv4 = Ipv4Packet::new(ethernet_packet.payload())
                     .expect("Couldn't Create ipv4 packet");
                 let ipv4_header = ipv4.into_header();
 
                 match ipv4_header.next_level_protocol {
-
                     IpNextHeaderProtocols::Tcp => {
+                        if ipv4.payload().is_empty() {
+                            return FullPacket::FullIpv4(FullIpv4 {
+                                timestamp: local_capture_time,
+                                ethernet: ethernet_header,
+                                ipv4: ipv4.into_header_with_payload(),
+                            });
+                        }
+
                         let tcp = TcpPacket::new(ipv4.payload())
-                            .expect("Couldn't Create Tcp Packet");
+                            .expect("Couldn't Create Tcp Packet IPv4");
+
                         return FullPacket::FullIpv4Tcp(FullIpv4Tcp {
                             timestamp: local_capture_time,
                             ethernet: ethernet_header,
@@ -117,8 +122,8 @@ impl FullPacket {
                     }
 
                     IpNextHeaderProtocols::Udp => {
-                        let udp = UdpPacket::new(ipv4.payload())
-                            .expect("Couldn't Create udp Packet");
+                        let udp =
+                            UdpPacket::new(ipv4.payload()).expect("Couldn't Create udp Packet");
                         return FullPacket::FullIpv4Udp(FullIpv4Udp {
                             timestamp: local_capture_time,
                             ethernet: ethernet_header,
@@ -128,8 +133,8 @@ impl FullPacket {
                     }
 
                     IpNextHeaderProtocols::Icmp => {
-                        let icmp = IcmpPacket::new(ipv4.payload())
-                            .expect("Couldn't Create ICMP Packet");
+                        let icmp =
+                            IcmpPacket::new(ipv4.payload()).expect("Couldn't Create ICMP Packet");
                         return FullPacket::FullIpv4Icmp(FullIpv4Icmp {
                             timestamp: local_capture_time,
                             ethernet: ethernet_header,
@@ -152,10 +157,17 @@ impl FullPacket {
                 let ipv6_header = ipv6.into_header();
 
                 match ipv6_header.next_header {
-
                     IpNextHeaderProtocols::Tcp => {
+                        if ipv6.payload().is_empty() {
+                            return FullPacket::FullIpv6(FullIpv6 {
+                                timestamp: local_capture_time,
+                                ethernet: ethernet_header,
+                                ipv6: ipv6.into_header_with_payload(),
+                            });
+                        }
+
                         let tcp = TcpPacket::new(ipv6.payload())
-                            .expect("Couldn't Create Tcp Packet");
+                            .expect("Couldn't Create Tcp Packet IPv6");
                         return FullPacket::FullIpv6Tcp(FullIpv6Tcp {
                             timestamp: local_capture_time,
                             ethernet: ethernet_header,
@@ -165,8 +177,8 @@ impl FullPacket {
                     }
 
                     IpNextHeaderProtocols::Udp => {
-                        let udp = UdpPacket::new(ipv6.payload())
-                            .expect("Couldn't Create udp Packet");
+                        let udp =
+                            UdpPacket::new(ipv6.payload()).expect("Couldn't Create udp Packet");
                         return FullPacket::FullIpv6Udp(FullIpv6Udp {
                             timestamp: local_capture_time,
                             ethernet: ethernet_header,
@@ -195,8 +207,8 @@ impl FullPacket {
             }
 
             EtherTypes::Arp => {
-                let arp = ArpPacket::new(ethernet_packet.payload())
-                    .expect("Couldn't Create arp packet");
+                let arp =
+                    ArpPacket::new(ethernet_packet.payload()).expect("Couldn't Create arp packet");
                 return FullPacket::FullArp(FullArp {
                     timestamp: local_capture_time,
                     ethernet: ethernet_header,
@@ -204,7 +216,10 @@ impl FullPacket {
                 });
             }
 
-            _ => FullPacket::FullEthernet(FullEthernet { ethernet: ethernet_header, timestamp: local_capture_time}),
+            _ => FullPacket::FullEthernet(FullEthernet {
+                ethernet: ethernet_header,
+                timestamp: local_capture_time,
+            }),
         }
     }
 
@@ -228,4 +243,3 @@ impl FullPacket {
         }
     }
 }
-

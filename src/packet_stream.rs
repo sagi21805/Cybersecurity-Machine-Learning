@@ -1,13 +1,14 @@
 use crate::packet::{FullPacket, Timestamp};
 
 pub struct PacketStream {
-    stream: Vec<FullPacket>
+    stream: Vec<FullPacket>,
 }
 
 impl PacketStream {
-
     pub fn new(stream_size: usize) -> Self {
-        Self { stream: Vec::<FullPacket>::with_capacity(stream_size) }
+        Self {
+            stream: Vec::<FullPacket>::with_capacity(stream_size),
+        }
     }
 
     pub fn add_packet(&mut self, packet: FullPacket) {
@@ -17,11 +18,10 @@ impl PacketStream {
     pub fn get_statistics(&self) {
         let last = self.stream.last().expect("PacketStream is empty");
         let first = self.stream.first().expect("PacketStream is empty");
-        let time = last.get_timestamp() - first.get_timestamp();    
-        println!("Packet per second: {}", time.num_seconds() as usize / self.stream.len())
+        let time = last.get_timestamp() - first.get_timestamp();
+        println!(
+            "Packet per second: {}",
+            self.stream.len() as f32 / time.num_seconds() as f32
+        )
     }
-
 }
-
-
-
