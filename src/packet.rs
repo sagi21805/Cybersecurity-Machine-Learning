@@ -15,6 +15,7 @@ macro_rules! FullEthernetPacket {
     ($( $protocol:ident ),*) => {
         paste! {
             #[derive(Debug, Clone)]
+            #[allow(dead_code)]
             pub struct [<Full$($protocol)+>] {
                 ethernet: Ethernet,
                 $(
@@ -25,21 +26,21 @@ macro_rules! FullEthernetPacket {
     };
 }
 
-FullEthernetPacket!(Tcp, Ipv4);
-FullEthernetPacket!(Tcp, Ipv6);
-FullEthernetPacket!(Udp, Ipv4);
-FullEthernetPacket!(Udp, Ipv6);
+FullEthernetPacket!(Ipv4, Tcp);
+FullEthernetPacket!(Ipv6, Tcp);
+FullEthernetPacket!(Ipv4, Udp);
+FullEthernetPacket!(Ipv6, Udp);
 FullEthernetPacket!(Arp);
 FullEthernetPacket!(Ipv4);
 FullEthernetPacket!(Ipv6);
 
 #[derive(Debug, Clone, Display)]
 pub enum FullPacket {
-    TcpIpv4(FullTcpIpv4),
-    UdpIpv4(FullUdpIpv4),
-    TcpIpv6(FullTcpIpv6),
-    UdpIpv6(FullUdpIpv6),
-    Arp(FullArp),
+    FullIpv4Tcp(FullIpv4Tcp),
+    FullIpv4Udp(FullIpv4Udp),
+    FullIpv6Tcp(FullIpv6Tcp),
+    FullIpv6Udp(FullIpv6Udp),
+    FullArp(FullArp),
     Ethernet(Ethernet),
     FullIpv4(FullIpv4),
     FullIpv6(FullIpv6),
@@ -67,10 +68,10 @@ impl FullPacket {
                         let tcp = TcpPacket::new(ipv4.payload())
                             .expect("Couldn't Create Tcp Packet");
 
-                        return FullPacket::TcpIpv4(FullTcpIpv4 {
+                        return FullPacket::FullIpv4Tcp(FullIpv4Tcp {
                             ethernet: ethernet_header,
                             ipv4: ipv4_header,
-                            tcp: tcp.into_header(),
+                            tcp: tcp.into_header_with_payload(),
                         });
                     }
 
@@ -79,17 +80,17 @@ impl FullPacket {
                         let udp = UdpPacket::new(ipv4.payload())
                             .expect("Coudln't Create udp Packet");
 
-                        return FullPacket::UdpIpv4(FullUdpIpv4 {
+                        return FullPacket::FullIpv4Udp(FullIpv4Udp {
                             ethernet: ethernet_header,
                             ipv4: ipv4_header,
-                            udp: udp.into_header()
+                            udp: udp.into_header_with_payload()
                         });
 
                     }
 
                     _ => FullPacket::FullIpv4(FullIpv4 {
                         ethernet: ethernet_header,
-                        ipv4: ipv4_header,
+                        ipv4: ipv4.into_header_with_payload(),
                     }),
                 }
             }
@@ -108,10 +109,10 @@ impl FullPacket {
                         let tcp = TcpPacket::new(ipv6.payload())
                             .expect("Couldn't Create Tcp Packet");
 
-                        return FullPacket::TcpIpv6(FullTcpIpv6 {
+                        return FullPacket::FullIpv6Tcp(FullIpv6Tcp {
                             ethernet: ethernet_header,
                             ipv6: ipv6_header,
-                            tcp: tcp.into_header(),
+                            tcp: tcp.into_header_with_payload(),
                         });
                     }
 
@@ -120,17 +121,17 @@ impl FullPacket {
                         let udp = UdpPacket::new(ipv6.payload())
                             .expect("Coudln't Create udp Packet");
 
-                        return FullPacket::UdpIpv6(FullUdpIpv6 {
+                        return FullPacket::FullIpv6Udp(FullIpv6Udp {
                             ethernet: ethernet_header,
                             ipv6: ipv6_header.clone(),
-                            udp: udp.into_header()
-                        });
+                            udp: udp.into_header_with_payload()
+                        }); 
 
                     }
 
                     _ => FullPacket::FullIpv6(FullIpv6 {
                         ethernet: ethernet_header,
-                        ipv6: ipv6_header,
+                        ipv6: ipv6.into_header_with_payload(),
                     }),
                     
                 }
@@ -141,7 +142,7 @@ impl FullPacket {
 
                 let arp = ArpPacket::new(ethernet_packet.payload()).expect("Couldn't Create arp packet");
 
-                return FullPacket::Arp(FullArp { ethernet: ethernet_header, arp:  arp.into_header()})
+                return FullPacket::FullArp(FullArp { ethernet: ethernet_header, arp:  arp.into_header_with_payload()})
 
             }
 
