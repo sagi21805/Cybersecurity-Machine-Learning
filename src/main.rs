@@ -1,7 +1,9 @@
 mod packet;
 mod protocol_utils;
+mod packet_stream;
 
 use packet::FullPacket;
+use packet_stream::PacketStream;
 use pcap::{Capture, Device};
 use libc::timeval;
 use chrono::{DateTime, Local};
@@ -30,8 +32,10 @@ fn main() {
         .expect("Failed to open capture");
 
     println!("Starting packet capture on interface {}", interface_name);
-
+    let mut packet_stream = PacketStream::new(2048);
     while let Ok(packet) = cap.next_packet() {
-        println!("received packet! {:?} at {:?}\n", FullPacket::new(packet.data), timeval_to_datetime(packet.header.ts));
-}
+        let full_packet = FullPacket::new(&packet.data, timeval_to_datetime(packet.header.ts));
+        packet_stream.add_packet(full_packet);
+        packet_stream.get_statistics();
+    }
 }
