@@ -1,12 +1,10 @@
 mod packet;
 mod protocol_utils;
 
-
 use packet::FullPacket;
 use pcap::{Capture, Device};
-use pnet::packet::ethernet::EthernetPacket;
 use libc::timeval;
-use chrono::{DateTime, NaiveDateTime, Local};
+use chrono::{DateTime, Local};
 
 
 fn timeval_to_datetime(tv: timeval) -> DateTime<Local> {
@@ -15,7 +13,7 @@ fn timeval_to_datetime(tv: timeval) -> DateTime<Local> {
     DateTime::from_timestamp(seconds, nanoseconds).unwrap().with_timezone(&Local)
 }
 fn main() {
-    let interface_name = "eth0";
+    let interface_name = "wlp0s20f3";
     let device = Device::list()
         .expect("Failed to list devices")
         .into_iter()
@@ -34,6 +32,6 @@ fn main() {
     println!("Starting packet capture on interface {}", interface_name);
 
     while let Ok(packet) = cap.next_packet() {
-        println!("received packet! {} at {:?}", FullPacket::new(packet.data), timeval_to_datetime(packet.header.ts));
+        println!("received packet! {:?} at {:?}\n", FullPacket::new(packet.data), timeval_to_datetime(packet.header.ts));
 }
 }
