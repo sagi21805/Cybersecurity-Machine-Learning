@@ -1,13 +1,13 @@
 use paste::paste;
 use pnet::packet::arp::{Arp, ArpPacket};
+use pnet::packet::dns::{Dns, DnsPacket};
 use pnet::packet::ethernet::{Ethernet, EthernetPacket};
+use pnet::packet::icmp::{Icmp, IcmpPacket};
+use pnet::packet::icmpv6::{Icmpv6, Icmpv6Packet};
 use pnet::packet::ipv4::{Ipv4, Ipv4Packet};
 use pnet::packet::ipv6::{Ipv6, Ipv6Packet};
 use pnet::packet::tcp::{Tcp, TcpPacket};
 use pnet::packet::udp::{Udp, UdpPacket};
-use pnet::packet::dns::{Dns, DnsPacket};
-use pnet::packet::icmp::{Icmp, IcmpPacket};
-use pnet::packet::icmpv6::{Icmpv6, Icmpv6Packet};
 // use pnet::packet::dhcp::{Dhcp, DhcpPacket};
 use pnet::packet::Packet;
 
@@ -42,8 +42,6 @@ macro_rules! into_header {
         }
     };
 }
-
-
 
 into_header! { Ethernet, destination, source, ethertype }
 into_header! { Ipv4, version, header_length, dscp, ecn, total_length, identification, flags, fragment_offset, ttl, next_level_protocol, checksum, source, destination, options}
