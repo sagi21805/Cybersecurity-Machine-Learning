@@ -1,6 +1,8 @@
 use crate::{full_packet::FullPacket, packet_stream::PacketStream, utils};
 use pcap::{Active, Capture, Device};
-use std::collections::LinkedList;
+use std::{collections::LinkedList, net::Shutdown};
+use tokio::sync::watch;
+use tokio::time::{self, Duration};
 
 pub struct Sniffer {
     cap: Capture<Active>,
@@ -9,11 +11,11 @@ pub struct Sniffer {
 }
 
 impl Sniffer {
-    pub fn new(device_name: &str, default_stream_size: usize) -> Self {
+    pub fn new(interface_name: &str, default_stream_size: usize) -> Self {
         let device = Device::list()
             .expect("Failed to list devices")
             .into_iter()
-            .find(|dev| dev.name == device_name)
+            .find(|dev| dev.name == interface_name)
             .expect("Failed to find specified device");
 
         // Initialize a capture with promiscuous mode and a larger buffer size
@@ -58,6 +60,36 @@ impl Sniffer {
             }
         }
     }
+
+    pub async fn silent_sniff(&mut self) {
+        match self.cap.next_packet() {
+            Ok(packet) => {
+                let packet =
+                    FullPacket::new(&packet.data, utils::timeval_to_datetime(packet.header.ts));
+                if self.current_stream().stream.len() >= self.default_stream_size {
+                    self.stream
+                        .push_front(PacketStream::new(self.default_stream_size));
+                }
+                self.current_stream().add_packet(packet);
+            }
+            Err(_) => {
+
+            }
+        }
+    }
+
+    pub async fn sniff_until(&mut self, mut shutdown_rx: watch::Receiver<()>) {
+        loop {
+            tokio::select! {
+                _ = shutdown_rx.changed() => {
+                    println!("Received shutdown signal, exiting loop.");
+                    break;
+                }
+
+                _ = self.silent_sniff() => { }
+            }
+        }
+    } 
 
     pub fn sniff_stream(&mut self) {
         self.stream
