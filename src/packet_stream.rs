@@ -1,7 +1,8 @@
-use crate::packet::{FullPacket, Timestamp};
+use crate::full_packet::{FullPacket, Timestamp};
 
+#[derive(Debug)]
 pub struct PacketStream {
-    stream: Vec<FullPacket>,
+    pub stream: Vec<FullPacket>,
 }
 
 impl PacketStream {
