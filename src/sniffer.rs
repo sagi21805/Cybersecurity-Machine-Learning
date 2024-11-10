@@ -1,12 +1,14 @@
 use crate::{full_packet::FullPacket, packet_stream::PacketStream, utils};
 use pcap::{Active, Capture, Device};
+use tokio::task;
 use std::{collections::LinkedList, net::Shutdown};
-use tokio::sync::watch;
-use tokio::time::{self, Duration};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use tokio::sync::Notify;
 
 pub struct Sniffer {
     cap: Capture<Active>,
-    stream: LinkedList<PacketStream>,
+    pub stream: LinkedList<PacketStream>,
     default_stream_size: usize,
 }
 
@@ -35,10 +37,6 @@ impl Sniffer {
         }
     }
 
-    pub fn stream(&self) -> &LinkedList<PacketStream> {
-        &self.stream
-    }
-
     pub fn current_stream(&mut self) -> &mut PacketStream {
         self.stream.front_mut().expect("Sniffer stream is empty")
     }
@@ -53,7 +51,11 @@ impl Sniffer {
                         .push_front(PacketStream::new(self.default_stream_size));
                 }
                 self.current_stream().add_packet(packet);
-                Ok(self.current_stream().stream.last().expect("Current packet stream is empty"))
+                Ok(self
+                    .current_stream()
+                    .stream
+                    .last()
+                    .expect("Current packet stream is empty"))
             }
             Err(e) => {
                 Err(e) // propagate the error
@@ -61,7 +63,7 @@ impl Sniffer {
         }
     }
 
-    pub async fn silent_sniff(&mut self) {
+    pub fn silent_sniff(&mut self) {
         match self.cap.next_packet() {
             Ok(packet) => {
                 let packet =
@@ -72,24 +74,24 @@ impl Sniffer {
                 }
                 self.current_stream().add_packet(packet);
             }
-            Err(_) => {
-
-            }
+            Err(_) => {}
         }
+        println!("Sniff");
     }
 
-    pub async fn sniff_until(&mut self, mut shutdown_rx: watch::Receiver<()>) {
-        loop {
-            tokio::select! {
-                _ = shutdown_rx.changed() => {
-                    println!("Received shutdown signal, exiting loop.");
-                    break;
-                }
+    // Make sniff_until async and use Notify for shutdown signal
+    pub async fn sniff_until(&mut self, shutdown_signal: Arc<AtomicBool>) {
+        println!("Started Sniffing");
 
-                _ = self.silent_sniff() => { }
-            }
+        while shutdown_signal.load(Ordering::Relaxed) {
+        
+            // Perform sniffing in a non-blocking way
+            self.silent_sniff();
+            println!("Sniffing");
         }
-    } 
+
+        println!("Signal Received");
+    }
 
     pub fn sniff_stream(&mut self) {
         self.stream

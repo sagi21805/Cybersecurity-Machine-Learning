@@ -1,6 +1,6 @@
 use crate::full_packet::{FullPacket, Timestamp};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PacketStream {
     pub stream: Vec<FullPacket>,
 }

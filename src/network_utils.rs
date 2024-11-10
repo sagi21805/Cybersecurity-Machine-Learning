@@ -1,9 +1,13 @@
 use pnet::datalink;
 use pnet::datalink::NetworkInterface;
-use pnet::packet::arp::{Arp, ArpHardwareTypes, ArpOperation, ArpOperations};
-use pnet::packet::ethernet::EtherTypes;
+use pnet::packet::arp::{Arp, ArpHardwareType, ArpHardwareTypes, ArpOperation, ArpOperations, ArpPacket, MutableArpPacket};
+use pnet::packet::ethernet::{
+    EtherType, EtherTypes, Ethernet, EthernetPacket, MutableEthernetPacket,
+};
+use pnet::packet::Packet;
 use pnet::util::MacAddr;
 use std::net::Ipv4Addr;
+use std::vec;
 
 pub fn get_local_interface() -> Option<NetworkInterface> {
     let interfaces = datalink::interfaces();
@@ -57,25 +61,40 @@ pub fn get_interface(interface_name: &str) -> Option<NetworkInterface> {
     return None;
 }
 
-pub fn create_arp(
+pub fn create_ethernet<'p>(
+    buffer: &'p mut [u8],
+    source_mac: MacAddr,
+    destination_mac: MacAddr,
+    proto: EtherType,
+    payload: &'p [u8],
+) -> EthernetPacket<'p> {
+    let mut packet = MutableEthernetPacket::new(buffer).expect("Can't create Ethernet packet");
+    packet.set_destination(destination_mac);
+    packet.set_source(source_mac);
+    packet.set_ethertype(proto);
+    packet.set_payload(&payload);
+    packet.consume_to_immutable()
+}
+
+pub fn create_arp<'p>(
+    buffer: &'p mut [u8],
     source_mac: MacAddr,
     target_mac: MacAddr,
     source_ip: Ipv4Addr,
     target_ip: Ipv4Addr,
-    operation: ArpOperation
-) -> Arp {
-    Arp {
-        hardware_type: ArpHardwareTypes::Ethernet,
-        hw_addr_len: 6,    // MAC address is 6 bytes
-        proto_addr_len: 4, // Ipv4 address is 4 bytes
-        protocol_type: EtherTypes::Ipv4,
-        operation: operation,
-        sender_hw_addr: source_mac,
-        sender_proto_addr: source_ip,
-        target_hw_addr: target_mac,
-        target_proto_addr: target_ip,
-        payload: Vec::new(),
-    }
+    operation: ArpOperation,
+) -> ArpPacket<'p> {
+    let mut packet = MutableArpPacket::new(
+        buffer
+    ).expect("Can't create Arp packet");
+    packet.set_hardware_type(ArpHardwareTypes::Ethernet);
+    packet.set_protocol_type(EtherTypes::Ipv4);
+    packet.set_hw_addr_len(6);
+    packet.set_proto_addr_len(4);
+    packet.set_operation(operation);
+    packet.set_sender_hw_addr(source_mac);
+    packet.set_sender_proto_addr(source_ip);
+    packet.set_target_hw_addr(target_mac);
+    packet.set_target_proto_addr(target_ip);
+    packet.consume_to_immutable()
 }
-
-
