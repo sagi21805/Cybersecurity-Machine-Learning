@@ -68,7 +68,6 @@ impl Sender {
     pub fn scan_arp(&mut self, network: Ipv4Network) {
         for address_num in 0..network.size() {
             let target_address = network.nth(address_num).expect("Address doesn't exist");
-            println!("Address: {}", target_address);
             self.send_arp(MacAddr::zero(), target_address, ArpOperations::Request);
         }
 

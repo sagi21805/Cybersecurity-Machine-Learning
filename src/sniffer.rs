@@ -77,21 +77,17 @@ impl Sniffer {
             }
             Err(_) => {}
         }
-        println!("Sniff");
     }
 
     // Make sniff_until async and use Notify for shutdown signal
     pub async fn sniff_until(&mut self, shutdown_signal: Arc<AtomicBool>) {
-        println!("Started Sniffing");
 
         while shutdown_signal.load(Ordering::Relaxed) {
         
             // Perform sniffing in a non-blocking way
             self.silent_sniff();
-            println!("Sniffing");
         }
 
-        println!("Signal Received");
     }
 
     pub fn sniff_stream(&mut self) {

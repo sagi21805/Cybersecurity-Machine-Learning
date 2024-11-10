@@ -12,7 +12,6 @@ use std::vec;
 pub fn get_local_interface() -> Option<NetworkInterface> {
     let interfaces = datalink::interfaces();
     for interface in interfaces {
-        println!("interface: {}", interface);
         if !interface.is_loopback() {
             return Some(interface);
         }
@@ -53,7 +52,6 @@ pub fn get_interface_ip(interface: &NetworkInterface) -> Option<Ipv4Addr> {
 pub fn get_interface(interface_name: &str) -> Option<NetworkInterface> {
     let interfaces = datalink::interfaces();
     for interface in interfaces {
-        println!("interface: {}", interface);
         if interface.name == interface_name {
             return Some(interface);
         }
