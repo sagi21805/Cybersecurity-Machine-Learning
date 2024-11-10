@@ -24,6 +24,7 @@ impl Sniffer {
         let cap = Capture::from_device(device)
             .expect("Failed to create capture from device")
             .promisc(true)
+            .timeout(1)
             .open()
             .expect("Failed to open capture");
 

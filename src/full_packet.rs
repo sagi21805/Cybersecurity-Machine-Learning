@@ -22,10 +22,10 @@ macro_rules! FullEthernetPacket {
             #[derive(Debug, Clone)]
             #[allow(dead_code)]
             pub struct [<Full$($protocol)+>] {
-                timestamp: DateTime<Local>,
-                ethernet: Ethernet,
+                pub timestamp: DateTime<Local>,
+                pub ethernet: Ethernet,
                 $(
-                    [<$protocol:lower>]:  $protocol,
+                    pub [<$protocol:lower>]:  $protocol,
                 )*
             }
 
