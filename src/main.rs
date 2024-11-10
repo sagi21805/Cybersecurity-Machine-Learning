@@ -15,8 +15,9 @@ use sniffer::Sniffer;
 
 #[tokio::main]
 async fn main() {
+    let t = std::time::Instant::now();
     // Wrap Sniffer in an Arc<Mutex> to allow shared ownership and mutability
-    let sniffer = Arc::new(tokio::sync::Mutex::new(Sniffer::new("wlp0s20f3", 100)));
+    let sniffer = Arc::new(tokio::sync::Mutex::new(Sniffer::new("wlp0s20f3", 5000)));
     let shutdown_signal = Arc::new(AtomicBool::new(true));
     let shutdown_signal_clone = Arc::clone(&shutdown_signal);
     
@@ -30,7 +31,6 @@ async fn main() {
     });
 
     // Simulate some work and then trigger shutdown after a delay
-    println!("Sniffing started...");
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
     let mut sender = Sender::new("wlp0s20f3");
     sender.scan_arp(Ipv4Network::new(Ipv4Addr::new(192, 168, 239, 140), 24).unwrap());
@@ -54,4 +54,6 @@ async fn main() {
             _ => {}
         });
     });
+
+    println!("Time {}", t.elapsed().as_secs_f32());
 }
