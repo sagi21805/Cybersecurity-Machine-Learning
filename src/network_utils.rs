@@ -1,13 +1,13 @@
 use pnet::datalink;
 use pnet::datalink::NetworkInterface;
-use pnet::packet::arp::{Arp, ArpHardwareType, ArpHardwareTypes, ArpOperation, ArpOperations, ArpPacket, MutableArpPacket};
+use pnet::ipnetwork::{IpNetwork, Ipv4Network};
+use pnet::packet::arp::{ArpHardwareTypes, ArpOperation, ArpPacket, MutableArpPacket};
 use pnet::packet::ethernet::{
-    EtherType, EtherTypes, Ethernet, EthernetPacket, MutableEthernetPacket,
+    EtherType, EtherTypes, EthernetPacket, MutableEthernetPacket,
 };
-use pnet::packet::Packet;
 use pnet::util::MacAddr;
 use std::net::Ipv4Addr;
-use std::vec;
+
 
 pub fn get_local_interface() -> Option<NetworkInterface> {
     let interfaces = datalink::interfaces();
@@ -19,26 +19,35 @@ pub fn get_local_interface() -> Option<NetworkInterface> {
     return None;
 }
 
-fn get_local_ip() -> Option<Ipv4Addr> {
+pub fn get_local_ip() -> Option<Ipv4Addr> {
     // Iterate over the available network interfaces.
-    let interfaces = datalink::interfaces();
-    for interface in interfaces {
-        for ip_network in interface.ips {
-            // Check if the IP address is an IPv4 address.
-            if let std::net::IpAddr::V4(ipv4) = ip_network.ip() {
-                // Return the first non-loopback IPv4 address found.
-                if !ipv4.is_loopback() {
-                    return Some(ipv4);
-                }
+    let interface = get_local_interface().expect("Can't find local interface");
+    for ip_network in interface.ips {
+        if let std::net::IpAddr::V4(ipv4) = ip_network.ip() {
+            // Return the first non-loopback IPv4 address found.
+            if !ipv4.is_loopback() {
+                return Some(ipv4);
             }
         }
     }
+    
     // Return None if no valid IP address is found.
     None
 }
 
+pub fn get__local_network(interface: &NetworkInterface) -> Option<Ipv4Network> {
+    for net in &interface.ips {
+        if let IpNetwork::V4(net_v4) = net {
+            if !net.ip().is_loopback() {
+                return Some(net_v4.clone());
+            }
+        }
+    }
+    None
+}
+
 pub fn get_interface_ip(interface: &NetworkInterface) -> Option<Ipv4Addr> {
-    for address in interface.ips.clone() {
+    for address in &interface.ips {
         if let std::net::IpAddr::V4(ipv4) = address.ip() {
             // Return the first non-loopback IPv4 address found.
             if !ipv4.is_loopback() {
