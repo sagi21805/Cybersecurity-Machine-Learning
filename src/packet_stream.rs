@@ -1,4 +1,4 @@
-use crate::full_packet::{FullPacket, Timestamp};
+use crate::full_packet::FullPacket;
 
 #[derive(Debug, Clone)]
 pub struct PacketStream {

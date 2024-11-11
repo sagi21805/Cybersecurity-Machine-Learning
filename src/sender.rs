@@ -1,6 +1,6 @@
 use std::net::{IpAddr, Ipv4Addr};
 
-use crate::network_utils::{self, create_arp, get_interface_ip};
+use crate::network_utils::{self, create_arp, get__local_network, get_interface_ip};
 use crate::sniffer::Sniffer;
 use crate::utils::struct_to_bytes;
 use pnet::datalink::{self, Channel, NetworkInterface};
@@ -65,7 +65,8 @@ impl Sender {
         self.send_ethernet(MacAddr::broadcast(), EtherTypes::Arp, arp.packet());
     }
 
-    pub fn scan_arp(&mut self, network: Ipv4Network) {
+    pub fn scan_arp(&mut self) {
+        let network = get__local_network(&self.interface).expect("Can't obtain IPv4 Network");
         for address_num in 0..network.size() {
             let target_address = network.nth(address_num).expect("Address doesn't exist");
             self.send_arp(MacAddr::zero(), target_address, ArpOperations::Request);
