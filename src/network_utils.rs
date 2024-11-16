@@ -2,12 +2,13 @@ use pnet::datalink;
 use pnet::datalink::NetworkInterface;
 use pnet::ipnetwork::{IpNetwork, Ipv4Network};
 use pnet::packet::arp::{ArpHardwareTypes, ArpOperation, ArpPacket, MutableArpPacket};
-use pnet::packet::ethernet::{
-    EtherType, EtherTypes, EthernetPacket, MutableEthernetPacket,
-};
+use pnet::packet::ethernet::{EtherType, EtherTypes, EthernetPacket, MutableEthernetPacket};
 use pnet::util::MacAddr;
 use std::net::Ipv4Addr;
 
+// In Bytes
+pub const ETHERNET_HEADER_SIZE: usize = 14;
+pub const ARP_HEADER_SIZE: usize = 28;
 
 pub fn get_local_interface() -> Option<NetworkInterface> {
     let interfaces = datalink::interfaces();
@@ -30,12 +31,12 @@ pub fn get_local_ip() -> Option<Ipv4Addr> {
             }
         }
     }
-    
+
     // Return None if no valid IP address is found.
     None
 }
 
-pub fn get__local_network(interface: &NetworkInterface) -> Option<Ipv4Network> {
+pub fn get_local_network(interface: &NetworkInterface) -> Option<Ipv4Network> {
     for net in &interface.ips {
         if let IpNetwork::V4(net_v4) = net {
             if !net.ip().is_loopback() {
@@ -85,22 +86,20 @@ pub fn create_ethernet<'p>(
 
 pub fn create_arp<'p>(
     buffer: &'p mut [u8],
-    source_mac: MacAddr,
+    sender_mac: MacAddr,
     target_mac: MacAddr,
-    source_ip: Ipv4Addr,
+    sender_ip: Ipv4Addr,
     target_ip: Ipv4Addr,
     operation: ArpOperation,
 ) -> ArpPacket<'p> {
-    let mut packet = MutableArpPacket::new(
-        buffer
-    ).expect("Can't create Arp packet");
+    let mut packet = MutableArpPacket::new(buffer).expect("Can't create Arp packet");
     packet.set_hardware_type(ArpHardwareTypes::Ethernet);
     packet.set_protocol_type(EtherTypes::Ipv4);
     packet.set_hw_addr_len(6);
     packet.set_proto_addr_len(4);
     packet.set_operation(operation);
-    packet.set_sender_hw_addr(source_mac);
-    packet.set_sender_proto_addr(source_ip);
+    packet.set_sender_hw_addr(sender_mac);
+    packet.set_sender_proto_addr(sender_ip);
     packet.set_target_hw_addr(target_mac);
     packet.set_target_proto_addr(target_ip);
     packet.consume_to_immutable()
