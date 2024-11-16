@@ -1,10 +1,10 @@
 use crate::{full_packet::FullPacket, packet_stream::PacketStream, utils};
 use pcap::{Active, Capture, Device};
-use tokio::task;
-use std::{collections::LinkedList, net::Shutdown};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::{collections::LinkedList, net::Shutdown};
 use tokio::sync::Notify;
+use tokio::task;
 
 pub struct Sniffer {
     cap: Capture<Active>,
@@ -81,13 +81,10 @@ impl Sniffer {
 
     // Make sniff_until async and use Notify for shutdown signal
     pub async fn sniff_until(&mut self, shutdown_signal: Arc<AtomicBool>) {
-
         while shutdown_signal.load(Ordering::Relaxed) {
-        
             // Perform sniffing in a non-blocking way
             self.silent_sniff();
         }
-
     }
 
     pub fn sniff_stream(&mut self) {
