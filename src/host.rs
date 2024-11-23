@@ -3,6 +3,7 @@ use pnet::ipnetwork::Ipv4Network;
 use pnet::util::MacAddr;
 use std::net::Ipv4Addr;
 
+#[derive(Debug, Clone)]
 pub struct Host {
     pub mac: MacAddr,
     pub ip: Ipv4Addr,
@@ -21,7 +22,7 @@ impl Host {
         }
     }
 
-    pub fn custom(mac: MacAddr, ip: Ipv4Addr, network: Ipv4Network) -> Self {
-        Self { mac, ip, network }
+    pub fn custom(mac: MacAddr, ip: Ipv4Addr, net_prefix: u8) -> Self {
+        Self { mac, ip, network: Ipv4Network::new(ip, net_prefix).expect("Invalid prefix") }
     }
 }

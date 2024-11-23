@@ -13,7 +13,7 @@ use std::net::Ipv4Addr;
 pub struct Sender {
     sender: Box<dyn DataLinkSender>,
     interface: NetworkInterface,
-    host: Host,
+    pub host: Host,
 }
 
 impl Sender {

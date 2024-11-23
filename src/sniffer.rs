@@ -1,19 +1,18 @@
-use crate::{full_packet::FullPacket, packet_stream::PacketStream, utils};
+use crate::utils::timeval_to_datetime;
+use crate::{full_packet::FullPacket, utils};
 use pcap::{Active, Capture, Device};
+use std::collections::LinkedList;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::{collections::LinkedList, net::Shutdown};
-use tokio::sync::Notify;
-use tokio::task;
 
 pub struct Sniffer {
-    cap: Capture<Active>,
-    pub stream: LinkedList<PacketStream>,
-    default_stream_size: usize,
+    pub cap: Capture<Active>,
+    pub file: pcap::Savefile,
+    pub stream: LinkedList<FullPacket>
 }
 
 impl Sniffer {
-    pub fn new(interface_name: &str, default_stream_size: usize) -> Self {
+    pub fn new(interface_name: &str) -> Self {
         let device = Device::list()
             .expect("Failed to list devices")
             .into_iter()
@@ -28,35 +27,34 @@ impl Sniffer {
             .open()
             .expect("Failed to open capture");
 
-        let mut stream = LinkedList::<PacketStream>::new();
-        stream.push_front(PacketStream::new(default_stream_size));
+
 
         Self {
+            file: cap.savefile("recording.pcap").unwrap(),
             cap,
-            stream,
-            default_stream_size,
+            stream: LinkedList::new()
         }
     }
 
-    pub fn current_stream(&mut self) -> &mut PacketStream {
-        self.stream.front_mut().expect("Sniffer stream is empty")
-    }
 
-    pub fn sniff(&mut self) -> Result<&FullPacket, pcap::Error> {
+    pub fn silent_sniff(&mut self) {
         match self.cap.next_packet() {
             Ok(packet) => {
-                let packet =
-                    FullPacket::new(&packet.data, utils::timeval_to_datetime(packet.header.ts));
-                if self.current_stream().stream.len() >= self.default_stream_size {
-                    self.stream
-                        .push_front(PacketStream::new(self.default_stream_size));
-                }
-                self.current_stream().add_packet(packet);
-                Ok(self
-                    .current_stream()
-                    .stream
-                    .last()
-                    .expect("Current packet stream is empty"))
+                self.file.write(&packet);
+                self.stream.push_back(FullPacket::new(
+                    packet.data,
+                    timeval_to_datetime(packet.header.ts)
+                ));
+            }
+            Err(_) => {}
+        }
+    }
+
+    pub fn sniff_raw(&mut self) -> Result<Vec<u8>, pcap::Error> {
+        match self.cap.next_packet() {
+            Ok(packet) => {
+                self.file.write(&packet);                
+                Ok(packet.data.to_vec())
             }
             Err(e) => {
                 Err(e) // propagate the error
@@ -64,20 +62,23 @@ impl Sniffer {
         }
     }
 
-    pub fn silent_sniff(&mut self) {
+    pub fn sniff(&mut self) -> Result<FullPacket, pcap::Error> {
         match self.cap.next_packet() {
             Ok(packet) => {
-                let packet =
-                    FullPacket::new(&packet.data, utils::timeval_to_datetime(packet.header.ts));
-                if self.current_stream().stream.len() >= self.default_stream_size {
-                    self.stream
-                        .push_front(PacketStream::new(self.default_stream_size));
-                }
-                self.current_stream().add_packet(packet);
+                self.file.write(&packet);
+                let full = FullPacket::new(
+                    packet.data,
+                    timeval_to_datetime(packet.header.ts)
+                );
+                self.stream.push_back(full.clone());
+                Ok(full)
             }
-            Err(_) => {}
+            Err(e) => {
+                Err(e) // propagate the error
+            }
         }
     }
+
 
     // Make sniff_until async and use Notify for shutdown signal
     pub async fn sniff_until(&mut self, shutdown_signal: Arc<AtomicBool>) {
@@ -87,21 +88,4 @@ impl Sniffer {
         }
     }
 
-    pub fn sniff_stream(&mut self) {
-        self.stream
-            .push_front(PacketStream::new(self.default_stream_size));
-        let mut packet_pushed = 0;
-
-        while packet_pushed < self.default_stream_size {
-            match self.cap.next_packet() {
-                Ok(packet) => {
-                    let packet =
-                        FullPacket::new(&packet.data, utils::timeval_to_datetime(packet.header.ts));
-                    self.current_stream().add_packet(packet);
-                    packet_pushed += 1;
-                }
-                Err(_) => {}
-            }
-        }
-    }
 }
